@@ -2,7 +2,7 @@ import type { AIProvider } from '@/types/ai-provider';
 import type { ConversationContext } from '@/types/conversation';
 import type { ReplyTone } from '@/constants/tones';
 import type { Settings } from '@/types/settings';
-import type { ProviderId } from '@/constants/providers';
+import { ProviderId } from '@/constants/providers';
 import { createConfiguredProvider } from '@/ai/registry';
 import { tokensForLength } from '@/models/settings';
 import { conversationFingerprint } from '@/models/conversation';
@@ -45,8 +45,10 @@ export async function generateReplies(
   const apiKey = await app.secrets.getKey(settings.providerId as ProviderId);
   const provider = createProviderFromStores(settings, apiKey);
   const memory = await app.memory.get(conversation.conversationId);
+  const cacheable = settings.providerId !== ProviderId.Mock;
   const cacheKey = await sha256(
     JSON.stringify({
+      v: 2,
       fp: conversationFingerprint(conversation),
       tones,
       model: settings.model,
@@ -56,8 +58,10 @@ export async function generateReplies(
       memory,
     }),
   );
-  const cached = await app.cache.get<Awaited<ReturnType<AIProvider['generateReply']>>>(cacheKey);
-  if (cached) return cached;
+  if (cacheable) {
+    const cached = await app.cache.get<Awaited<ReturnType<AIProvider['generateReply']>>>(cacheKey);
+    if (cached) return cached;
+  }
 
   const gate = limiter.tryConsume();
   if (!gate.allowed) throw new RateLimitedError(gate.retryAfterMs);
@@ -69,7 +73,7 @@ export async function generateReplies(
     maxTokens: tokensForLength(settings.responseLength),
     memorySummary: memory,
   });
-  await app.cache.set(cacheKey, replies);
+  if (cacheable) await app.cache.set(cacheKey, replies);
   return replies;
 }
 
