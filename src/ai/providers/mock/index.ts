@@ -15,17 +15,13 @@ export const meta = {
   needsApiKey: false,
 };
 
-const closers: Record<ReplyTone, (name: string) => string> = {
-  professional: () => `Best,\nAdrian`,
-  friendly: (name) => `Thanks ${name} — talk soon!`,
-  casual: () => `Sounds good — I'll ping you.`,
-  funny: () => `If Thursday combusts, I have a backup calendar and a backup joke.`,
-  empathetic: (name) => `Appreciate you ${name}. I'll come prepared.`,
-  short: () => `Thursday 3pm PT works. I'll send a calendar invite.`,
-  long: () =>
-    `I'll send a short agenda beforehand so we can spend the time on the lazy-load path and the key-handling review rather than recapping the doc.`,
-  assertive: () => `Confirming Thursday 3pm PT. I'll send the invite in the next hour.`,
-};
+interface ThreadScene {
+  name: string;
+  title: string;
+  lastAsk: string;
+  points: string[];
+  nextStep: string;
+}
 
 export class MockProvider implements AIProvider {
   readonly id = meta.id;
@@ -38,13 +34,11 @@ export class MockProvider implements AIProvider {
 
   async generateReply(request: GenerateReplyRequest): Promise<GeneratedReply[]> {
     await wait(380);
-    const other = lastOtherMessage(request.conversation);
-    const name = firstName(other?.author ?? request.conversation.title);
-    const ask = inferAsk(request.conversation);
+    const scene = sceneFrom(request.conversation);
     return request.tones.map((tone, index) => ({
-      id: `mock-${tone}-${index}`,
+      id: `mock-${request.conversation.conversationId}-${tone}-${index}`,
       tone,
-      text: buildReply(tone, name, ask, request.conversation.title),
+      text: buildReply(tone, scene),
       provider: this.name,
       model: this.defaultModel,
     }));
@@ -79,11 +73,11 @@ export class MockProvider implements AIProvider {
 
   async suggestFollowUps(conversation: ConversationContext): Promise<string[]> {
     await wait(220);
-    const name = firstName(lastOtherMessage(conversation)?.author ?? 'there');
+    const scene = sceneFrom(conversation);
     return [
-      `Does Thursday 3pm PT still work for you, ${name}?`,
-      'I can send a 20-minute agenda covering the registry and the insert path.',
-      'Want me to record a 2-minute loom if calendars slip?',
+      scene.nextStep,
+      `Want a tighter version of: “${scene.lastAsk.slice(0, 72)}${scene.lastAsk.length > 72 ? '…' : ''}”?`,
+      `I can reply in ${conversation.platformName} with the next step in one message.`,
     ];
   }
 
@@ -91,8 +85,8 @@ export class MockProvider implements AIProvider {
     await wait(220);
     return [
       `Hey — still thinking about ${conversation.title}. Open to a quick sync this week?`,
-      'I had one tighter way to phrase the adapter contract if you want a look.',
-      'No rush on the doc — I can start a spike on the Gmail selectors either way.',
+      `Had one follow-up on what you wrote last, if now is a decent time.`,
+      `No rush — I can pick this up in ${conversation.platformName} whenever you are free.`,
     ];
   }
 }
@@ -101,27 +95,66 @@ export function createProvider(): AIProvider {
   return new MockProvider();
 }
 
-function buildReply(tone: ReplyTone, name: string, ask: string, title: string): string {
-  const heading: Record<ReplyTone, string> = {
-    professional: `Hi ${name},\n\nThanks for the note on ${title}. ${ask} I can do Thursday at 3pm PT and will walk through adapter lazy-loading plus keeping API keys in the service worker only.`,
-    friendly: `Hey ${name} — really glad the architecture landed. ${ask} Thursday 3pm PT works on my side.`,
-    casual: `Hey ${name}, yep — lazy-load the adapters, keys stay in the worker. Thursday 3pm PT is good.`,
-    funny: `Hi ${name} — I promise the adapters load faster than I write commit messages. ${ask} Thursday 3pm PT, I'll bring the architecture and fewer jokes than this sentence.`,
-    empathetic: `Hi ${name}, thanks for reading the doc so carefully — those are the two questions that actually matter. ${ask} Thursday 3pm PT works, and I'll come with a tight demo.`,
-    short: `Thursday 3pm PT works. Yes to lazy-loaded adapters and worker-only keys.`,
-    long: `Hi ${name},\n\nThanks for reviewing the design. Yes: adapters should lazy-load so a Gmail tab never pays for Discord selectors, and API keys must live only in the MV3 service worker — content scripts on mail.google.com should never see them.\n\n${ask} Thursday 3pm PT is open. I'll send a 20-minute agenda covering the registry, the insert path, and a live generate → insert demo.`,
-    assertive: `Hi ${name} — yes to both: lazy-loaded adapters and worker-only keys. Let's use Thursday 3pm PT. I'll send the invite.`,
+export function sceneFrom(conversation: ConversationContext): ThreadScene {
+  const other = lastOtherMessage(conversation);
+  const blob = transcript(conversation).toLowerCase();
+  const lastAsk = (other?.body ?? '').trim();
+  const points: string[] = [];
+  let nextStep = 'Happy to take the next step.';
+
+  if (blob.includes('standup') || blob.includes('patch')) {
+    nextStep = "I'll have a tiny patch up before standup.";
+  } else if (blob.includes('thursday') || blob.includes('3pm')) {
+    nextStep = 'Thursday 3pm PT works.';
+  } else if (blob.includes('next week') || blob.includes('30-minute') || blob.includes('30 minutes')) {
+    nextStep = "Yes — I'm open to 30 minutes next week. I'll send a few times.";
+  }
+
+  if (blob.includes('lazy-load')) points.push('adapters should lazy-load');
+  if (blob.includes('api key') || blob.includes('service worker')) {
+    points.push('keys stay in the service worker only');
+  }
+  if (blob.includes('content script') || blob.includes('firing twice') || blob.includes('fingerprint')) {
+    points.push('gate the content script on a conversation fingerprint so Gmail compose does not double-fire');
+  }
+  if (blob.includes('open/closed') || blob.includes('intern')) {
+    points.push('glad the adapter architecture resonated');
+  }
+
+  return {
+    name: firstName(other?.author ?? conversation.title),
+    title: conversation.title,
+    lastAsk,
+    points,
+    nextStep,
   };
-  return `${heading[tone]}\n\n${closers[tone](name)}`.trim();
 }
 
-function inferAsk(conversation: ConversationContext): string {
-  const blob = transcript(conversation).toLowerCase();
-  if (blob.includes('thursday') || blob.includes('demo')) {
-    return 'Happy to demo Thursday.';
-  }
-  if (blob.includes('?')) return 'I can answer those directly.';
-  return 'Happy to take the next step.';
+function buildReply(tone: ReplyTone, scene: ThreadScene): string {
+  const facts = scene.points.length ? scene.points.join(', and ') + '.' : '';
+  const ask = scene.lastAsk ? `You asked: “${clip(scene.lastAsk, 140)}”` : `Re: ${scene.title}`;
+  const body: Record<ReplyTone, string> = {
+    professional: `Hi ${scene.name},\n\n${ask}\n\n${facts} ${scene.nextStep}`.trim(),
+    friendly: `Hey ${scene.name} — thanks for flagging this on ${scene.title}. ${facts} ${scene.nextStep}`,
+    casual: `Hey ${scene.name}, got it. ${facts} ${scene.nextStep}`,
+    funny: `Hi ${scene.name} — I read that twice so I would not ship the wrong thread. ${facts} ${scene.nextStep}`,
+    empathetic: `Hi ${scene.name}, that is a fair ask. ${ask}\n\n${facts} ${scene.nextStep}`,
+    short: scene.nextStep,
+    long: `Hi ${scene.name},\n\n${ask}\n\n${facts || 'I can take this from here.'}\n\n${scene.nextStep}\n\nI will keep the reply specific to this thread and skip anything we did not actually discuss.`,
+    assertive: `Hi ${scene.name} — ${scene.nextStep} ${facts}`.trim(),
+  };
+  return `${body[tone]}\n\n${closer(tone, scene.name)}`.trim();
+}
+
+function closer(tone: ReplyTone, name: string): string {
+  if (tone === 'professional') return 'Best,\nAdrian';
+  if (tone === 'friendly' || tone === 'empathetic') return `Thanks ${name} — talk soon.`;
+  if (tone === 'short' || tone === 'assertive') return '';
+  return "I'll ping you when it is in.";
+}
+
+function clip(value: string, max: number): string {
+  return value.length > max ? `${value.slice(0, max - 1)}…` : value;
 }
 
 function firstName(value: string): string {
