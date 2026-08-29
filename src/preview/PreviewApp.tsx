@@ -13,7 +13,6 @@ export function PreviewApp() {
     if (!next) return;
     setPreviewConversation(next);
     setActiveId(id);
-    window.location.reload();
   }
 
   return (
@@ -63,7 +62,7 @@ export function PreviewApp() {
               <span className="h-2.5 w-2.5 rounded-full bg-zinc-300 dark:bg-zinc-700" />
               <span className="ml-2 text-[11px] text-zinc-400">ReplyMe · extension popup</span>
             </div>
-            <PopupApp />
+            <PopupApp key={activeId} />
           </div>
         </section>
       </div>
