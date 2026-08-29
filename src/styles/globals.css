@@ -1,0 +1,67 @@
+@import "tailwindcss";
+@import "@fontsource-variable/inter";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans: "Inter Variable", Inter, ui-sans-serif, system-ui, sans-serif;
+  --color-accent: #8b5cf6;
+  --color-accent-2: #22d3ee;
+  --color-ink: #09090b;
+  --color-paper: #f6f5f2;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  background: var(--color-paper);
+  color: #18181b;
+}
+
+.dark body {
+  background: #07070a;
+  color: #f4f4f5;
+}
+
+.glass {
+  background: color-mix(in oklab, white 72%, transparent);
+  backdrop-filter: blur(18px);
+  border: 1px solid color-mix(in oklab, black 8%, transparent);
+}
+
+.dark .glass {
+  background: color-mix(in oklab, #18181b 72%, transparent);
+  border-color: color-mix(in oklab, white 10%, transparent);
+}
+
+.reply-shell {
+  background:
+    radial-gradient(1200px 400px at 10% -10%, color-mix(in oklab, var(--color-accent) 22%, transparent), transparent 50%),
+    radial-gradient(900px 360px at 110% 0%, color-mix(in oklab, var(--color-accent-2) 16%, transparent), transparent 46%);
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.rise {
+  animation: rise 280ms ease-out both;
+}
+
+.scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in oklab, #a1a1aa 50%, transparent) transparent;
+}

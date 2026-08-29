@@ -1,0 +1,5 @@
+{
+  "id": "google-messages",
+  "name": "Google Messages",
+  "matches": ["https://messages.google.com/*"]
+}

@@ -1,0 +1,5 @@
+{
+  "id": "linkedin",
+  "name": "LinkedIn",
+  "matches": ["https://www.linkedin.com/messaging/*", "https://linkedin.com/messaging/*"]
+}

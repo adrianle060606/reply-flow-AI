@@ -1,0 +1,5 @@
+{
+  "id": "whatsapp",
+  "name": "WhatsApp",
+  "matches": ["https://web.whatsapp.com/*"]
+}

@@ -1,0 +1,5 @@
+{
+  "id": "slack",
+  "name": "Slack",
+  "matches": ["https://app.slack.com/*", "https://*.slack.com/*"]
+}

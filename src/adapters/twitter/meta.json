@@ -1,0 +1,10 @@
+{
+  "id": "twitter",
+  "name": "X",
+  "matches": [
+    "https://x.com/messages*",
+    "https://x.com/i/chat*",
+    "https://twitter.com/messages*",
+    "https://twitter.com/i/chat*"
+  ]
+}

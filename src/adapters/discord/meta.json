@@ -1,0 +1,5 @@
+{
+  "id": "discord",
+  "name": "Discord",
+  "matches": ["https://discord.com/*", "https://discordapp.com/*"]
+}
